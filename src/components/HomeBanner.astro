@@ -1,6 +1,8 @@
 ---
 import { Image } from 'astro:assets'
-import GitHubActivityCalendar from '~/components/GitHubActivityCalendar.astro'
+import GitHubContributionsPanel from '~/components/GitHubContributionsPanel.astro'
+import InteractiveTerminal from '~/components/InteractiveTerminal.astro'
+import TermFrame from '~/components/TermFrame.astro'
 import type { FrontmatterImage } from '~/types'
 
 interface Props {
@@ -12,7 +14,7 @@ const { avatarImage, githubCalendar } = Astro.props
 
 <div class="my-6 md:mx-2">
   <div
-    class="flex flex-col sm:flex-row items-center justify-around sm:gap-5 max-w-full mb-6"
+    class="flex flex-col sm:flex-row items-center sm:items-start gap-5 max-w-full mb-8"
   >
     {
       avatarImage && (
@@ -20,18 +22,31 @@ const { avatarImage, githubCalendar } = Astro.props
           priority
           src={avatarImage.src}
           alt={avatarImage.alt}
-          class="rounded-full border-8 border-accent/15 size-36 aspect-square box-content shrink-0"
+          class="rounded-full border-8 border-accent/15 size-36 aspect-square box-content shrink-0 anim-fade-up"
           widths={[288]}
           height={144}
           width={144}
         />
       )
     }
-    <div>
-      <div class:list={['m-4 max-w-full prose']}>
+    <TermFrame label="zsh" class="w-full flex-1">
+      <p class="mb-3 text-accent font-semibold">
+        <span class="anim-typing anim-typing-solo" style="--type-len: 8">$ whoami</span
+        ><span class="cursor" aria-hidden="true"></span>
+      </p>
+      <div class="max-w-full prose anim-fade-up" style="animation-delay: 0.6s">
         <slot />
       </div>
-    </div>
+    </TermFrame>
   </div>
-  {githubCalendar && <GitHubActivityCalendar username={githubCalendar} />}
+  <div class="mb-8">
+    <InteractiveTerminal />
+  </div>
+  {
+    githubCalendar && (
+      <div class="mb-8">
+        <GitHubContributionsPanel username={githubCalendar} />
+      </div>
+    )
+  }
 </div>

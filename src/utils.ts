@@ -26,6 +26,31 @@ export function pick(obj: Record<string, any>, keys: string[]) {
   )
 }
 
+export function range(n: number) {
+  return [...Array(n).keys()]
+}
+
+// Builds a `steps`-length gradient of CSS color-mix() expressions between
+// `start` and `end`. Shared by GitHubActivityCalendar (contribution level
+// shades) and GitHubContributions3D (bar shades).
+export function calcColorScale(
+  [start, end]: [string, string],
+  steps: number,
+): Array<string> {
+  return range(steps).map((i) => {
+    switch (i) {
+      case 0:
+        return start
+      case steps - 1:
+        return end
+      default: {
+        const pos = (i / (steps - 1)) * 100
+        return `color-mix(in oklab, ${end} ${parseFloat(pos.toFixed(2))}%, ${start})`
+      }
+    }
+  })
+}
+
 export function flattenThemeColors(theme: ExpressiveCodeTheme): {
   [key: string]: string
 } {

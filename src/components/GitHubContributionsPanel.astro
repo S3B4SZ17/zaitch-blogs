@@ -1,0 +1,151 @@
+---
+// One panel, two views of the same contribution data: the flat calendar
+// heatmap and the 3D bar chart, cross-faded via a small pill toggle instead
+// of being stacked as two separate boxed widgets.
+import GitHubActivityCalendar from '~/components/GitHubActivityCalendar.astro'
+import GitHubContributions3D from '~/components/GitHubContributions3D.astro'
+
+interface Props {
+  username: string
+}
+const { username } = Astro.props
+---
+
+<div class="contrib-panel">
+  <div class="contrib-panel-header">
+    <span class="contrib-panel-title">contributions</span>
+    <div class="contrib-toggle" role="tablist" aria-label="Contribution chart view">
+      <button
+        type="button"
+        class="contrib-toggle-btn is-active"
+        data-view="calendar"
+        role="tab"
+        aria-selected="true"
+        aria-controls="contrib-view-calendar"
+      >
+        calendar
+      </button>
+      <button
+        type="button"
+        class="contrib-toggle-btn"
+        data-view="3d"
+        role="tab"
+        aria-selected="false"
+        aria-controls="contrib-view-3d"
+      >
+        3d
+      </button>
+    </div>
+  </div>
+  <div class="contrib-views">
+    <div
+      id="contrib-view-calendar"
+      class="contrib-view is-active"
+      data-view-panel="calendar"
+      role="tabpanel"
+    >
+      <GitHubActivityCalendar username={username} />
+    </div>
+    <div id="contrib-view-3d" class="contrib-view" data-view-panel="3d" role="tabpanel">
+      <GitHubContributions3D username={username} />
+    </div>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('.contrib-panel').forEach((panel) => {
+    const buttons = panel.querySelectorAll<HTMLButtonElement>('.contrib-toggle-btn')
+    const views = panel.querySelectorAll<HTMLElement>('.contrib-view')
+    buttons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const target = btn.dataset.view
+        buttons.forEach((b) => {
+          const active = b === btn
+          b.classList.toggle('is-active', active)
+          b.setAttribute('aria-selected', active ? 'true' : 'false')
+        })
+        views.forEach((v) => {
+          v.classList.toggle('is-active', v.dataset.viewPanel === target)
+        })
+      })
+    })
+  })
+</script>
+
+<style>
+  .contrib-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .contrib-panel-title {
+    font-size: 0.8rem;
+    letter-spacing: 0.02em;
+    color: color-mix(in oklab, var(--theme-foreground) 55%, transparent);
+  }
+
+  .contrib-toggle {
+    display: inline-flex;
+    border: 1px solid color-mix(in oklab, var(--theme-accent) 30%, transparent);
+    border-radius: 999px;
+    padding: 2px;
+    gap: 2px;
+  }
+
+  .contrib-toggle-btn {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.7rem;
+    border-radius: 999px;
+    color: color-mix(in oklab, var(--theme-foreground) 65%, transparent);
+    background: transparent;
+    border: none;
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease;
+  }
+
+  .contrib-toggle-btn.is-active {
+    background: var(--theme-accent);
+    color: var(--theme-background);
+  }
+
+  .contrib-views {
+    display: grid;
+    /* Grid tracks default to fitting their item's content width, which lets
+       the calendar's fixed-width SVG (53 columns) push the whole panel
+       wider than the page. Force the track back down to the container. */
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .contrib-view {
+    grid-area: 1 / 1;
+    /* Grid items default to min-width: auto, i.e. "at least as wide as my
+       content" -- overriding it to 0 is what actually lets the calendar's
+       own overflow-x-auto take over instead of blowing out the panel. */
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    opacity: 0;
+    transform: translateY(6px);
+    pointer-events: none;
+    transition:
+      opacity 0.3s ease,
+      transform 0.3s ease;
+  }
+
+  .contrib-view.is-active {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .contrib-view {
+      transition: none;
+    }
+  }
+</style>

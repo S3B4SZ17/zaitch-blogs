@@ -4,6 +4,8 @@ import Header from '~/components/Header.astro'
 import Footer from '~/components/Footer.astro'
 import LightDarkAutoThemeLoader from '~/components/LightDarkAutoThemeLoader.astro'
 import SelectThemeLoader from '~/components/SelectThemeLoader.astro'
+import BootSequenceLoader from '~/components/BootSequenceLoader.astro'
+import BootSequence from '~/components/BootSequence.astro'
 import siteConfig from '~/site.config'
 import { pick, resolveThemeColorStyles } from '~/utils'
 import crypto from 'crypto'
@@ -13,9 +15,14 @@ interface Props {
   description?: string
   tags?: string[]
   author?: string
+  // The ambient page-glitch (see global.css's #page-content animation) is
+  // a nice ambient touch on the homepage/listing pages, but a periodic
+  // position-jump is genuinely distracting mid-article -- individual post
+  // pages opt out via this prop.
+  disablePageGlitch?: boolean
 }
 
-const { title, description, tags, author } = Astro.props
+const { title, description, tags, author, disablePageGlitch = false } = Astro.props
 const pageUrl = new URL(Astro.url.pathname, Astro.site).href.replace(/\/$/, '') // Remove trailing slash for consistency
 const pageType = Astro.url.pathname.startsWith('/posts') ? 'article' : 'website'
 const pageTitle = title ? `${title} - ${siteConfig.title}` : siteConfig.title
@@ -121,6 +128,9 @@ let generatedCss: string = cssLines.join('\n')
   data-light-theme={lightTheme}
   data-theme-mode={themeMode}
   data-theme-hash={themeHash}
+  data-boot-cooldown-hours={siteConfig.bootSequence
+    ? siteConfig.bootSequence.cooldownHours
+    : undefined}
 >
   <head>
     <meta charset="UTF-8" />
@@ -153,9 +163,13 @@ let generatedCss: string = cssLines.join('\n')
     <style is:inline set:html={generatedCss}></style>
     {themeMode === 'light-dark-auto' && <LightDarkAutoThemeLoader />}
     {themeMode === 'select' && <SelectThemeLoader />}
+    {siteConfig.bootSequence && <BootSequenceLoader />}
   </head>
   <body class="w-full h-full m-0 bg-background text-foreground">
+    {siteConfig.bootSequence && <BootSequence />}
     <div
+      id="page-content"
+      data-glitch={disablePageGlitch ? 'off' : 'on'}
       class="flex flex-col max-w-3xl min-h-screen border-accent/10 m-auto p-3 sm:py-5 sm:px-6 md:py-10"
     >
       <Header />
@@ -164,5 +178,25 @@ let generatedCss: string = cssLines.join('\n')
       </main>
       <Footer />
     </div>
+    <script>
+      // Reveal-on-scroll for anything opted in with [data-reveal].
+      // Re-runs on every navigation since this is a classic MPA (native
+      // view-transition, not a client router), so no rehydration to worry about.
+      const revealTargets = document.querySelectorAll('[data-reveal]')
+      if (revealTargets.length > 0) {
+        const observer = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (entry.isIntersecting) {
+                entry.target.classList.add('is-visible')
+                observer.unobserve(entry.target)
+              }
+            }
+          },
+          { threshold: 0.15, rootMargin: '0px 0px -40px 0px' },
+        )
+        revealTargets.forEach((el) => observer.observe(el))
+      }
+    </script>
   </body>
 </html>

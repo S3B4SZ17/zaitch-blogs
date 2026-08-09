@@ -3,16 +3,32 @@ import type { NavLink } from '~/types'
 
 interface Props {
   link: NavLink
+  // A single uppercase letter this link responds to as a keyboard
+  // shortcut (see Header.astro's hotkey computation + listener).
+  // Omitted for external links -- a keypress unexpectedly navigating
+  // away from the site would be a bad surprise.
+  hotkey?: string
 }
 
-const { link } = Astro.props
+const { link, hotkey } = Astro.props
+const name = link.name.toUpperCase()
+const rest = hotkey ? name.slice(1) : name
 ---
 
 <a
-  class="underline"
+  class="nav-link term-nav-link glitch-hover"
   rel={link.external ? 'noopener noreferrer' : undefined}
   target={link.external ? '_blank' : undefined}
   href={link.url}
+  aria-keyshortcuts={hotkey}
+  data-hotkey={hotkey}
 >
-  {link.name}
+  {hotkey && <span class="term-nav-hotkey">[{hotkey}]</span>}{rest}{
+    link.external && (
+      <span class="term-nav-external" aria-hidden="true">
+        {' '}
+        &#8599;
+      </span>
+    )
+  }
 </a>

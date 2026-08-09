@@ -8,18 +8,40 @@ import NavLink from '~/components/NavLink.astro'
 const lightDarkAutoTheme = siteConfig.themes.mode === 'light-dark-auto'
 const selectTheme =
   siteConfig.themes.mode === 'select' && siteConfig.themes.include.length > 1
+
+// One keyboard hotkey per internal nav link, derived from its first
+// letter. External links (GitHub, etc) don't get one -- a keypress
+// unexpectedly navigating away from the site, or opening a new tab,
+// would be a bad surprise. Falls back to no hotkey on a letter collision
+// rather than silently overriding an earlier link's shortcut.
+const usedHotkeys = new Set<string>()
+const navLinksWithHotkeys = siteConfig.navLinks.map((link) => {
+  if (link.external) return { link, hotkey: undefined }
+  const letter = link.name.trim().charAt(0).toUpperCase()
+  if (letter && !usedHotkeys.has(letter)) {
+    usedHotkeys.add(letter)
+    return { link, hotkey: letter }
+  }
+  return { link, hotkey: undefined }
+})
 ---
 
-<header>
-  <div class="relative flex items-center justify-between bg-accent/10 rounded-xl">
+<header class="term-header">
+  <div class="term-statusbar">
     <a
       id="logo"
       href="/"
-      class="block px-4 py-1.5 max-w-full no-underline items-center bg-accent text-background font-bold rounded-xl"
+      class="block px-5 py-2 max-w-full no-underline items-center bg-accent text-background font-bold text-lg rounded-xl"
     >
-      {siteConfig.title}
+      <span
+        id="logo-text"
+        class="anim-typing anim-typing-retro"
+        style={`--type-len: ${siteConfig.title.length}; --type-duration: 1.8s`}
+        >{siteConfig.title}</span
+      ><span class="cursor" aria-hidden="true"></span>
     </a>
-    <div class="flex items-center gap-3 sm:mr-3">
+    <span class="term-statusbar-meta" aria-hidden="true">// system online</span>
+    <div class="term-statusbar-actions">
       <Search trailingSlashes={siteConfig.trailingSlashes} />
       {lightDarkAutoTheme && <LightDarkAutoButton />}
       {selectTheme && <SelectTheme />}
@@ -35,12 +57,12 @@ const selectTheme =
         </button>
         <ul
           id="nav-mobile-list"
-          class="invisible absolute flex flex-col bg-background shadow text-accent border-2 m-0 p-2.5 top-11.5 left-auto right-0 z-50 rounded-xl"
+          class="invisible absolute flex flex-col bg-background shadow text-accent border-2 m-0 p-2.5 top-11.5 left-auto right-0 z-50 rounded-xl origin-top-right"
         >
           {
-            siteConfig.navLinks.map((link) => (
+            navLinksWithHotkeys.map(({ link, hotkey }) => (
               <li class="p-1" aria-expanded="false">
-                <NavLink link={link} />
+                <NavLink link={link} hotkey={hotkey} />
               </li>
             ))
           }
@@ -48,18 +70,39 @@ const selectTheme =
       </nav>
     </div>
   </div>
-  <nav aria-label="Menu" class="p-0 mt-4 ml-0.5 text-accent hidden sm:block">
-    <ul class="flex flex-row text-accent">
+  <nav aria-label="Menu" class="term-nav hidden sm:block">
+    <ul class="term-nav-list">
       {
-        siteConfig.navLinks.map((link) => (
-          <li class="mr-5" aria-expanded="true">
-            <NavLink link={link} />
+        navLinksWithHotkeys.map(({ link, hotkey }) => (
+          <li>
+            <NavLink link={link} hotkey={hotkey} />
           </li>
         ))
       }
     </ul>
   </nav>
 </header>
+
+<style>
+  #nav-mobile-list {
+    opacity: 0;
+    transform: scale(0.95);
+    transition:
+      opacity 0.15s ease-out,
+      transform 0.15s ease-out;
+  }
+
+  #nav-mobile-list:not(.invisible) {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #nav-mobile-list {
+      transition: none;
+    }
+  }
+</style>
 
 <script>
   const navMobileButton = document.getElementById('nav-mobile-button')
@@ -84,4 +127,51 @@ const selectTheme =
   navMobileButton?.addEventListener('click', (_ev) => {
     toggleNavMobileMenu('toggle')
   })
+
+  // Replay the logo's typewriter entrance periodically so it keeps
+  // feeling "alive" without looping continuously (which would be
+  // distracting). Reflow trick: briefly clear the animation via inline
+  // style, forcing the browser to restart it from the class's rules.
+  const logoText = document.getElementById('logo-text')
+  const prefersReducedMotion = window.matchMedia(
+    '(prefers-reduced-motion: reduce)',
+  ).matches
+  if (logoText && !prefersReducedMotion) {
+    setInterval(() => {
+      logoText.style.animation = 'none'
+      void logoText.offsetWidth // force reflow
+      logoText.style.animation = ''
+    }, 60_000)
+  }
+
+  // Nav hotkeys (H/P/A/...). Guarded against: typing anywhere (inputs,
+  // textareas, contenteditable), any modifier key held, an open dialog
+  // (search/theme picker), and the boot sequence still being on screen.
+  const hotkeyLinks = document.querySelectorAll<HTMLAnchorElement>(
+    '.term-nav-link[data-hotkey]',
+  )
+  if (hotkeyLinks.length > 0) {
+    window.addEventListener('keydown', (ev) => {
+      if (ev.metaKey || ev.ctrlKey || ev.altKey) return
+      if (document.documentElement.getAttribute('data-boot-pending') === 'true') return
+      if (document.querySelector('dialog[open]')) return
+      const active = document.activeElement as HTMLElement | null
+      const activeTag = active?.tagName
+      if (
+        activeTag === 'INPUT' ||
+        activeTag === 'TEXTAREA' ||
+        activeTag === 'SELECT' ||
+        active?.isContentEditable
+      ) {
+        return
+      }
+      const key = ev.key.toUpperCase()
+      for (const link of hotkeyLinks) {
+        if (link.dataset.hotkey === key) {
+          window.location.href = link.href
+          break
+        }
+      }
+    })
+  }
 </script>

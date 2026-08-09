@@ -1,5 +1,4 @@
 ---
-import IconChevronsRight from '~/icons/chevrons-right.svg'
 import type { CollectionEntry } from 'astro:content'
 import { render } from 'astro:content'
 import Tags from '~/components/Tags.astro'
@@ -24,23 +23,24 @@ const samePage = Astro.url.pathname === `/posts/${post.id}`
 const articleLink = samePage ? `#${post.id}` : `/posts/${post.id}`
 ---
 
-<article class="w-full py-5 my-1 md:my-4 border-accent/10">
-  <h1 class="mb-3 text-2xl text-heading1 font-semibold">
-    <a href={articleLink}># {post.data.title}</a>
-  </h1>
-  <PostInfo post={post} class="mb-3 mt-4" />
-  {description && <p class="pl-0.5 my-4 text-base/7 text-foreground">{description}</p>}
+<article class="post-row post-card" data-reveal>
+  <a
+    href={articleLink}
+    class="post-row-link"
+    aria-label={`${samePage ? 'Continue reading' : 'Read'}: ${post.data.title}`}
+  >
+    <span class="post-row-marker" aria-hidden="true">&gt;</span>
+    <span class="post-row-title glow-text">{post.data.title}</span>
+    <span class="post-row-fill" aria-hidden="true"></span>
+    <span class="post-row-arrow" aria-hidden="true">&rarr;</span>
+  </a>
+  <PostInfo post={post} class="post-row-meta" />
+  {description && <p class="post-row-desc">{description}</p>}
   {
     tags && (
-      <div class="mb-6">
+      <div class="post-row-tags">
         <Tags tags={tags} />
       </div>
     )
   }
-  <div>
-    <a class="button flex items-center !pl-3.5" href={articleLink}>
-      {samePage ? 'Continue' : 'Read'}
-      <IconChevronsRight class="size-5 ml-2" />
-    </a>
-  </div>
 </article>

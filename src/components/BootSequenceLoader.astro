@@ -1,0 +1,45 @@
+---
+
+---
+
+<script is:inline>
+  ;(function bootGate() {
+    // Runs synchronously in <head>, before first paint -- mirrors
+    // SelectThemeLoader.astro's pattern for the same reason: setting
+    // data-boot-pending here (rather than in BootSequence.astro's own
+    // script, which runs later in <body>) avoids a flash of the real
+    // page before the overlay's CSS can hide it.
+    //
+    // Uses localStorage with a cooldown (read from data-boot-cooldown-hours,
+    // set in Layout.astro from siteConfig.bootSequence), not sessionStorage.
+    // sessionStorage is scoped per-tab, so it doesn't reliably survive
+    // "open a new tab" or "reopen the browser" the way a visitor would
+    // expect a "seen it already" flag to -- and it has no real expiry, so
+    // once dismissed it's gone for that tab's lifetime rather than coming
+    // back for a returning visitor later.
+    try {
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      const cooldownAttr = document.documentElement.getAttribute(
+        'data-boot-cooldown-hours',
+      )
+      // Falls back to 24h if the attribute is missing or non-numeric --
+      // NOT if it's explicitly "0", so a deliberate 0-hour config is still
+      // respected. Number(null) is 0, which would otherwise silently
+      // collapse to "always show" rather than the documented default.
+      const cooldownHours =
+        cooldownAttr !== null && Number.isFinite(Number(cooldownAttr))
+          ? Number(cooldownAttr)
+          : 24
+      const lastSeenAt = Number(localStorage.getItem('zaitch-boot-seen-at') || 0)
+      const cooldownMs = cooldownHours * 60 * 60 * 1000
+      const onCooldown = Date.now() - lastSeenAt < cooldownMs
+      if (!reducedMotion && !onCooldown) {
+        document.documentElement.setAttribute('data-boot-pending', 'true')
+      }
+    } catch {
+      // localStorage can throw in some locked-down browser contexts
+      // (private mode, embedded iframes) -- fail open, skip the boot
+      // sequence rather than break the page.
+    }
+  })()
+</script>

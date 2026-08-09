@@ -9,6 +9,7 @@ import PostAddendum from '~/components/PostAddendum.astro'
 import TableOfContents from '~/components/TableOfContents.astro'
 import { Image } from 'astro:assets'
 import GiscusLoader from '~/components/GiscusLoader.astro'
+import TermFrame from '~/components/TermFrame.astro'
 import siteConfig from '~/site.config'
 import Tags from '~/components/Tags.astro'
 import PostInfo from '~/components/PostInfo.astro'
@@ -71,6 +72,7 @@ if (postData.tags && postData.tags.length > 0) {
   description={postData.description}
   author={postData.author}
   tags={postData.tags}
+  disablePageGlitch
 >
   <article class="max-w-full py-7.5" data-pagefind-body>
     {
@@ -140,6 +142,27 @@ if (postData.tags && postData.tags.length > 0) {
         {next && <PostPreview post={next} />}
       </section>
     ) : null
+  }
+  {
+    siteConfig.topicSuggestionsUrl && (
+      <section>
+        <DividerText text="Got an idea?" />
+        <TermFrame label="~/suggest" class="my-2">
+          <p class="mb-4">
+            Comments are off for now, but if there's a topic you'd like to see covered,
+            let me know.
+          </p>
+          <a
+            class="button inline-flex items-center"
+            href={siteConfig.topicSuggestionsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            $ suggest --topic
+          </a>
+        </TermFrame>
+      </section>
+    )
   }
   {
     siteConfig.giscus && (

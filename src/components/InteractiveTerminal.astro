@@ -1,0 +1,416 @@
+---
+// A real, typeable terminal: visitors can run a small set of commands
+// (help, whoami, posts, subscribe, ...) against this site. Inspired by
+// https://ivansalloum.com/'s "this terminal is real" hero.
+import siteConfig from '~/site.config'
+import { getSortedPosts } from '~/utils'
+
+const sortedPosts = await getSortedPosts()
+const recentPosts = sortedPosts
+  .slice()
+  .reverse()
+  .slice(0, 5)
+  .map((post) => ({ title: post.data.title, url: `/posts/${post.id}` }))
+
+const social = siteConfig.socialLinks
+const listmonk = siteConfig.listmonk
+
+// The prompt reads as "you've logged into my machine" -- update promptUser
+// by hand if you'd rather it not derive from your display name.
+const promptUser = siteConfig.author.split(' ')[0]?.toLowerCase() || 'guest'
+const promptHost = 'zaitch'
+---
+
+<div class="term-window" data-reveal>
+  <div class="term-titlebar">
+    <span class="term-dots" aria-hidden="true">
+      <span class="term-dot term-dot-red"></span>
+      <span class="term-dot term-dot-yellow"></span>
+      <span class="term-dot term-dot-green"></span>
+    </span>
+    <span class="term-title">{promptUser}@{promptHost}: ~</span>
+  </div>
+  <div class="term-body" id="term-body" role="log" aria-live="polite">
+    <p class="term-line">
+      This terminal is real. Type <button
+        type="button"
+        class="term-cmd-link glitch-hover"
+        data-run-cmd="help">help</button
+      > to see what it can do.
+    </p>
+  </div>
+  <div class="term-inputline">
+    <label for="term-input" class="term-prompt">{promptUser}@{promptHost}:~$</label>
+    <input
+      id="term-input"
+      class="term-input"
+      type="text"
+      autocomplete="off"
+      autocapitalize="off"
+      spellcheck="false"
+      aria-label="Terminal command input"
+    />
+  </div>
+</div>
+
+<script
+  define:vars={{
+    recentPosts,
+    githubUrl: social?.github ?? null,
+    linkedinUrl: social?.linkedin ?? null,
+    emailAddr: social?.email ?? null,
+    authorName: siteConfig.author,
+    siteDescription: siteConfig.description,
+    listmonkConfigured: Boolean(listmonk),
+    listmonkEndpoint: listmonk?.endpoint ?? '',
+    listmonkListUuids: listmonk?.listUuids ?? [],
+    promptUser,
+    promptHost,
+  }}
+>
+  const termBody = document.getElementById('term-body')
+  const termInput = document.getElementById('term-input')
+  const termWindow = termInput?.closest('.term-window')
+
+  if (termBody && termInput && termWindow) {
+    const cmdHistory = []
+    let historyIndex = 0
+
+    function escapeHtml(str) {
+      const div = document.createElement('div')
+      div.textContent = str
+      return div.innerHTML
+    }
+
+    function print(html, kind) {
+      const line = document.createElement('div')
+      line.className = kind ? `term-line term-${kind}` : 'term-line'
+      line.innerHTML = html
+      termBody.appendChild(line)
+      termBody.scrollTop = termBody.scrollHeight
+    }
+
+    const commands = {
+      help: {
+        desc: 'list available commands',
+        run: () => {
+          const html = Object.keys(commands)
+            .sort()
+            .map(
+              (name) =>
+                `<div class="term-help-entry"><span class="term-cmd-name">${name}</span><span class="term-help-desc">${commands[name].desc}</span></div>`,
+            )
+            .join('')
+          print(html)
+        },
+      },
+      whoami: {
+        desc: 'about the person running this box',
+        run: () => {
+          print(
+            [authorName, siteDescription].filter(Boolean).map(escapeHtml).join('<br />'),
+          )
+        },
+      },
+      posts: {
+        desc: 'list the latest posts',
+        run: () => {
+          if (recentPosts.length === 0) {
+            print('No posts yet. Check back soon.')
+            return
+          }
+          print(
+            recentPosts
+              .map((post) => `→ <a href="${post.url}">${escapeHtml(post.title)}</a>`)
+              .join('<br />'),
+          )
+        },
+      },
+      projects: {
+        desc: 'see what I build',
+        run: () => {
+          if (!githubUrl) {
+            print('No GitHub profile configured.', 'error')
+            return
+          }
+          print(
+            `→ <a href="${escapeHtml(githubUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(githubUrl)}</a>`,
+          )
+        },
+      },
+      contact: {
+        desc: 'ways to reach me',
+        run: () => {
+          const lines = []
+          if (emailAddr) lines.push(`email      ${emailAddr}`)
+          if (githubUrl) lines.push(`github     ${githubUrl}`)
+          if (linkedinUrl) lines.push(`linkedin   ${linkedinUrl}`)
+          if (lines.length === 0) {
+            print('No contact info configured.')
+            return
+          }
+          print(lines.map(escapeHtml).join('<br />'))
+        },
+      },
+      subscribe: {
+        desc: 'subscribe <email> — join the mailing list',
+        run: (args) => {
+          const email = args[0]
+          if (!email) {
+            print('Usage: subscribe &lt;email&gt;', 'error')
+            return
+          }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            print(`"${escapeHtml(email)}" doesn't look like a valid email.`, 'error')
+            return
+          }
+          if (!listmonkConfigured) {
+            print("Mailing list isn't live yet — check back soon.")
+            return
+          }
+          print('Subscribing…')
+          const body = new URLSearchParams()
+          body.set('email', email)
+          body.set('l', listmonkListUuids.join(','))
+          fetch(listmonkEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body,
+          })
+            .then((res) => {
+              if (res.ok) {
+                print(`You're in — check your inbox to confirm, ${escapeHtml(email)}.`)
+              } else {
+                print('Something went wrong subscribing. Try again later.', 'error')
+              }
+            })
+            .catch(() =>
+              print('Something went wrong subscribing. Try again later.', 'error'),
+            )
+        },
+      },
+      date: {
+        desc: 'print the current date',
+        run: () => print(escapeHtml(new Date().toString())),
+      },
+      clear: {
+        desc: 'clear the screen',
+        run: () => {
+          termBody.innerHTML = ''
+        },
+      },
+    }
+
+    function runCommand(raw) {
+      const trimmed = raw.trim()
+      print(
+        `<span class="term-prompt-inline">${promptUser}@${promptHost}:~$</span> ${escapeHtml(trimmed)}`,
+        'cmd',
+      )
+      if (!trimmed) return
+      const [name, ...args] = trimmed.split(/\s+/)
+      const command = commands[name.toLowerCase()]
+      if (!command) {
+        print(
+          `command not found: ${escapeHtml(name)}. Type 'help' for a list of commands.`,
+          'error',
+        )
+        return
+      }
+      command.run(args)
+    }
+
+    termInput.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') {
+        const value = termInput.value
+        if (value.trim()) {
+          cmdHistory.push(value)
+        }
+        historyIndex = cmdHistory.length
+        runCommand(value)
+        termInput.value = ''
+      } else if (ev.key === 'ArrowUp') {
+        if (cmdHistory.length === 0) return
+        ev.preventDefault()
+        historyIndex = Math.max(0, historyIndex - 1)
+        termInput.value = cmdHistory[historyIndex] ?? ''
+      } else if (ev.key === 'ArrowDown') {
+        if (cmdHistory.length === 0) return
+        ev.preventDefault()
+        historyIndex = Math.min(cmdHistory.length, historyIndex + 1)
+        termInput.value = cmdHistory[historyIndex] ?? ''
+      } else if (ev.key === 'Tab') {
+        const partial = termInput.value.trim().toLowerCase()
+        if (!partial) return
+        ev.preventDefault()
+        const match = Object.keys(commands).find((name) => name.startsWith(partial))
+        if (match) termInput.value = match
+      }
+    })
+
+    termWindow.addEventListener('click', () => {
+      if (!window.getSelection()?.toString()) {
+        termInput.focus()
+      }
+    })
+
+    termBody.addEventListener('click', (ev) => {
+      const trigger = ev.target.closest('[data-run-cmd]')
+      const cmd = trigger?.getAttribute('data-run-cmd')
+      if (cmd) {
+        runCommand(cmd)
+        termInput.focus()
+      }
+    })
+  }
+</script>
+
+<style is:global>
+  /* Global, not scoped: most of the terminal's content (command output,
+     including the colored/bold command names in `help`) is injected at
+     runtime via innerHTML, so it never gets Astro's scoping attribute and
+     would silently fail to match scoped selectors. */
+  .term-window {
+    font-family: var(--theme-font), monospace;
+    background: color-mix(
+      in oklab,
+      var(--theme-background) 96%,
+      var(--theme-foreground) 4%
+    );
+    border: 1px solid color-mix(in oklab, var(--theme-foreground) 12%, transparent);
+    border-radius: 0.75rem;
+    overflow: hidden;
+  }
+
+  .term-titlebar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 0.85rem;
+    background: color-mix(in oklab, var(--theme-foreground) 6%, transparent);
+    border-bottom: 1px solid color-mix(in oklab, var(--theme-foreground) 10%, transparent);
+  }
+
+  .term-dots {
+    display: flex;
+    gap: 0.4rem;
+  }
+
+  .term-dot {
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--theme-foreground) 25%, transparent);
+  }
+
+  .term-dot-red {
+    background: color-mix(in oklab, var(--theme-red) 70%, transparent);
+  }
+
+  .term-dot-yellow {
+    background: color-mix(in oklab, var(--theme-yellow) 70%, transparent);
+  }
+
+  .term-dot-green {
+    background: color-mix(in oklab, var(--theme-green) 70%, transparent);
+  }
+
+  .term-title {
+    margin-inline-start: 0.25rem;
+    font-size: 0.8rem;
+    color: color-mix(in oklab, var(--theme-foreground) 55%, transparent);
+  }
+
+  .term-body {
+    max-height: 16rem;
+    overflow-y: auto;
+    padding: 1rem 1.1rem;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    scrollbar-width: thin;
+  }
+
+  .term-line {
+    margin: 0 0 0.35rem;
+    overflow-wrap: break-word;
+  }
+
+  .term-line a {
+    color: var(--theme-link);
+    text-decoration: underline;
+  }
+
+  .term-error {
+    color: var(--theme-red);
+  }
+
+  .term-prompt-inline {
+    color: var(--theme-accent);
+    margin-inline-end: 0.4rem;
+  }
+
+  .term-help-entry {
+    margin-bottom: 0.5rem;
+  }
+
+  .term-help-entry:last-child {
+    margin-bottom: 0;
+  }
+
+  .term-cmd-name {
+    display: block;
+    color: var(--theme-accent);
+    font-weight: 700;
+  }
+
+  .term-help-desc {
+    display: block;
+    padding-left: 1.5rem;
+    color: color-mix(in oklab, var(--theme-foreground) 70%, transparent);
+  }
+
+  .term-cmd-link {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--theme-accent);
+    text-decoration: underline;
+    cursor: pointer;
+    font: inherit;
+  }
+
+  .term-inputline {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.7rem 1.1rem;
+    border-top: 1px solid color-mix(in oklab, var(--theme-foreground) 10%, transparent);
+  }
+
+  .term-prompt {
+    color: var(--theme-accent);
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: text;
+  }
+
+  .term-input {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--theme-foreground);
+    font: inherit;
+    caret-color: var(--theme-accent);
+  }
+
+  /* Overrides global.css's input:focus-visible/:active outline (higher
+     specificity than a plain .term-input rule) -- a boxed focus ring here
+     breaks the illusion of typing directly into a real terminal line. */
+  .term-input:focus,
+  .term-input:focus-visible,
+  .term-input:active {
+    outline: none;
+  }
+</style>

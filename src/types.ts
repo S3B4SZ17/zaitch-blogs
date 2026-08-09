@@ -164,6 +164,24 @@ export type GiscusConfig = {
   reactionsEnabled: boolean
 }
 
+// Config for the interactive terminal's `subscribe` command, posted to a
+// self-hosted Listmonk instance's public subscription endpoint. Leave this
+// undefined until Listmonk is deployed; NOTE the endpoint path and field
+// names here are Listmonk's documented public subscription form contract
+// but haven't been verified against a live instance.
+export type ListmonkConfig = {
+  endpoint: string
+  listUuids: string[]
+}
+
+// Config for the homepage boot sequence (fake POST/boot log shown before
+// the site is "usable"). Uses localStorage with a cooldown -- shared
+// across tabs, unlike sessionStorage -- so it doesn't retrigger on every
+// new tab, but also isn't gone forever after one dismissal.
+export type BootSequenceConfig = {
+  cooldownHours: number
+}
+
 export interface SiteConfig {
   site: string
   font: string
@@ -177,6 +195,13 @@ export interface SiteConfig {
   themes: ThemesConfig
   socialLinks: SocialLinks
   navLinks: NavLink[]
-  giscus: GiscusConfig | undefined,
+  giscus: GiscusConfig | undefined
+  listmonk: ListmonkConfig | undefined
+  // Link shown at the bottom of every post inviting readers to suggest a
+  // topic, in place of the disabled Comments section. Any URL works (a
+  // GitHub Discussion, a form, a mailto:) -- left undefined, the CTA just
+  // doesn't render.
+  topicSuggestionsUrl: string | undefined
+  bootSequence: BootSequenceConfig | false
   characters: Record<string, string>
 }

@@ -1,0 +1,79 @@
+---
+// Fake boot/POST log, shown once per cooldown window (see
+// BootSequenceLoader.astro for the localStorage-based gate). Visibility is
+// purely CSS-driven off `data-boot-pending` on <html>, set before first
+// paint to avoid a flash of the real page. This component only handles:
+// showing the log lines, moving focus + `inert` so it's genuinely modal
+// for keyboard/screen-reader users, and dismissing on any key/click.
+import siteConfig from '~/site.config'
+
+const osName = `${siteConfig.title.split(' ')[0]?.toUpperCase() || 'SYSTEM'}_OS`
+
+const bootLines = [
+  'booting kernel',
+  'mounting /home',
+  'establishing homelab uplink',
+  'loading blog engine (astro)',
+  'indexing posts',
+]
+const padWidth = Math.max(...bootLines.map((line) => line.length)) + 4
+const lineDelay = (i: number) => 180 + i * 140
+---
+
+<div
+  class="boot-overlay"
+  id="boot-overlay"
+  role="dialog"
+  aria-modal="true"
+  aria-label="Boot sequence"
+  tabindex="-1"
+>
+  <p class="boot-line" style="animation-delay: 0ms">{osName} v1.0.0</p>
+  {
+    bootLines.map((line, i) => (
+      <p class="boot-line" style={`animation-delay: ${lineDelay(i)}ms`}>
+        {line.padEnd(padWidth, '.')}
+        <span class="boot-line-ok">[ OK ]</span>
+      </p>
+    ))
+  }
+  <p class="boot-line" style={`animation-delay: ${lineDelay(bootLines.length) + 200}ms`}>
+    welcome, guest.
+  </p>
+  <p
+    class="boot-prompt"
+    style={`animation-delay: ${lineDelay(bootLines.length) + 500}ms`}
+  >
+    press any key to continue
+  </p>
+</div>
+
+<script>
+  const overlay = document.getElementById('boot-overlay')
+  const pageContent = document.getElementById('page-content')
+  const isPending = document.documentElement.getAttribute('data-boot-pending') === 'true'
+
+  if (overlay && isPending) {
+    pageContent?.setAttribute('inert', '')
+    overlay.focus()
+
+    const dismiss = () => {
+      overlay.classList.add('is-dismissing')
+      window.removeEventListener('keydown', dismiss)
+      window.removeEventListener('pointerdown', dismiss)
+      setTimeout(() => {
+        document.documentElement.removeAttribute('data-boot-pending')
+        pageContent?.removeAttribute('inert')
+        try {
+          localStorage.setItem('zaitch-boot-seen-at', String(Date.now()))
+        } catch {
+          // localStorage can throw in locked-down contexts -- the overlay
+          // is already dismissed either way, it just won't stay dismissed
+          // past this tab's lifetime.
+        }
+      }, 400)
+    }
+    window.addEventListener('keydown', dismiss)
+    window.addEventListener('pointerdown', dismiss)
+  }
+</script>

@@ -1,0 +1,31 @@
+---
+// A minimal square-cornered frame with a small labeled tab (icon + text)
+// cut into the top border -- a lighter-weight cousin of InteractiveTerminal's
+// full titlebar chrome, for content that should read as "terminal" without
+// the visual weight of a real window.
+interface Props {
+  label: string
+  class?: string
+}
+const { label, class: className } = Astro.props
+---
+
+<div class:list={['term-frame', className]}>
+  <div class="term-frame-label">
+    <svg
+      class="term-frame-icon"
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.6"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <polyline points="2.5 3.5 7 8 2.5 12.5"></polyline>
+      <line x1="8" y1="12.5" x2="13.5" y2="12.5"></line>
+    </svg>
+    <span>{label}</span>
+  </div>
+  <slot />
+</div>

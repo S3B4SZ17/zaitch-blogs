@@ -37,7 +37,7 @@ const config: SiteConfig = {
       url: '/about',
     },
     {
-      name: 'Archive',
+      name: 'Posts',
       url: '/posts',
     },
     {
@@ -162,12 +162,32 @@ const config: SiteConfig = {
   // Take the values from the generated script tag at https://giscus.app and fill them in here.
   // IMPORTANT: Update giscus.json in the root of the project with your own website URL
   // If you don't want to use Giscus, set this to undefined.
-  giscus: {
-    repo: 'stelcodes/multiterm-astro',
-    repoId: 'R_kgDOPNnBig',
-    category: 'Giscus',
-    categoryId: 'DIC_kwDOPNnBis4CteOc',
-    reactionsEnabled: true, // Enable reactions on post itself
+  // Comments are disabled for now. Set this back to a config object to re-enable
+  // (see https://giscus.app for how to generate repo/category ids).
+  giscus: undefined,
+  // Powers the `subscribe` command in the homepage terminal. Leave this
+  // undefined until a Listmonk instance is deployed -- the terminal will
+  // show a friendly "not live yet" message instead of failing.
+  // Once Listmonk is up, point this at its public subscription endpoint,
+  // e.g. { endpoint: 'https://lists.zaitch.io/subscription/form', listUuids: ['<uuid>'] }
+  // NOTE: verify the endpoint path and field names against your Listmonk
+  // version's docs -- this hasn't been tested against a live instance, and
+  // Listmonk's instance also needs CORS configured to allow this site's origin.
+  listmonk: undefined,
+  // Shown at the bottom of every post as a "got an idea?" CTA, replacing
+  // the disabled Comments section. Point it at whatever you'd like readers
+  // to use -- a GitHub Discussion works well since it reuses the repo you
+  // already had wired up for giscus, e.g.
+  // 'https://github.com/<you>/<repo>/discussions/new?category=ideas'
+  // Leave undefined to hide the CTA entirely.
+  topicSuggestionsUrl: undefined,
+  // The homepage boot sequence (fake POST/boot log on first visit). Shows
+  // once, then stays hidden for `cooldownHours` before it's eligible to
+  // show again -- so a returning visitor a day later gets to see it again,
+  // but opening five tabs in the same sitting doesn't retrigger it five
+  // times. Set to `false` to disable it entirely.
+  bootSequence: {
+    cooldownHours: 24,
   },
   // These are characters available for the character chat feature.
   // To add your own character, add an image file to the top-level `/public` directory

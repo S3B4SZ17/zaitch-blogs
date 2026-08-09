@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import 'katex/dist/katex.css';
+@import '@fontsource/vt323';
 
 /* https://fontsource.org/fonts/jetbrains-mono/install */
 /* jetbrains-mono-latin-wght-normal */
@@ -41,6 +42,9 @@
   --color-cyan: var(--theme-cyan);
   --default-font-family: var(--theme-font), monospace;
   --default-mono-font-family: var(--theme-font), monospace;
+  /* Bitmap/pixel accent font -- used sparingly (terminal chrome, boot
+     sequence, logo), never for body copy where it would hurt readability. */
+  --font-vt323: 'VT323', var(--theme-font), monospace;
 }
 
 header {
@@ -63,6 +67,12 @@ html {
   /* Prevents layout from jumping when opening theme select or search dialog menus */
   scrollbar-gutter: stable;
   scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }
 
 body {
@@ -94,6 +104,15 @@ a {
 
 a.button {
   @apply inline-flex text-accent border-3 border-accent/30 border-double py-1.5 px-3 whitespace-nowrap hover:bg-accent/8 rounded-xl transition-colors;
+
+  svg {
+    transition: transform 0.2s ease;
+  }
+
+  &:hover svg,
+  &:focus-visible svg {
+    transform: translateX(3px);
+  }
 }
 
 header button,
@@ -110,6 +129,486 @@ article img {
 
   &[data-pixelated] {
     image-rendering: pixelated;
+  }
+}
+
+/* ============================================================
+   CRT screen layer
+   A fixed, pointer-events:none overlay simulating a CRT tube:
+   scanlines + vignette (static) and a slow phosphor scan-bar
+   sweep (animated). Sits above all page content -- including
+   the header/nav -- since a real CRT effect covers the whole
+   screen, not just individual elements. Native <dialog> still
+   renders above it regardless of z-index (browser top layer).
+   Dropped on narrow viewports (moire risk on dense phone
+   screens) and under prefers-reduced-motion.
+   ============================================================ */
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  pointer-events: none;
+}
+
+body::before {
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      color-mix(in oklab, black 9%, transparent) 0px,
+      color-mix(in oklab, black 9%, transparent) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    radial-gradient(
+      ellipse at center,
+      transparent 50%,
+      color-mix(in oklab, black 36%, transparent) 125%
+    );
+}
+
+body::after {
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in oklab, var(--theme-accent) 28%, transparent) 43%,
+    color-mix(in oklab, var(--theme-accent) 42%, transparent) 50%,
+    color-mix(in oklab, var(--theme-accent) 28%, transparent) 57%,
+    transparent
+  );
+  background-size: 100% 260%;
+  mix-blend-mode: overlay;
+  animation: crt-scan-sweep 7s linear infinite;
+}
+
+@keyframes crt-scan-sweep {
+  from {
+    background-position: 0 -160%;
+  }
+  to {
+    background-position: 0 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  body::before,
+  body::after {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before {
+    /* Keep the static vignette/scanlines -- only the moving sweep goes. */
+    animation: none;
+  }
+
+  body::after {
+    display: none;
+  }
+}
+
+/* Ambient page glitch: a rare, brief signal-stutter on the actual content
+   (not just the overlay layers above), like a CRT dropping sync for a
+   frame. Two ~60ms jolts per 10s loop -- still infrequent, but each hold
+   is long enough to actually register (the original 10-15ms holds were
+   close to a single frame at 60fps and mostly got lost). Off on individual
+   post pages (Layout's disablePageGlitch prop) -- fun on the homepage and
+   listings, distracting mid-article. */
+#page-content[data-glitch='on'] {
+  animation: page-glitch 10s steps(1) infinite;
+}
+
+@keyframes page-glitch {
+  0%,
+  95%,
+  100% {
+    transform: translate(0, 0);
+    filter: none;
+  }
+  95.3% {
+    transform: translate(-6px, 2px);
+    filter: hue-rotate(18deg) saturate(1.6) contrast(1.15) brightness(1.08);
+  }
+  95.9% {
+    transform: translate(0, 0);
+    filter: none;
+  }
+  96.4% {
+    transform: translate(6px, -2px);
+    filter: hue-rotate(-18deg) saturate(1.5) contrast(1.1);
+  }
+  97% {
+    transform: translate(0, 0);
+    filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #page-content {
+    animation: none;
+  }
+}
+
+/* ============================================================
+   Retro-tech motion system
+   A small, restrained set of terminal-flavored animations:
+   blinking block cursors, a typing intro, scroll reveals, an
+   accent phosphor glow, and animated underlines. Everything
+   here backs off under prefers-reduced-motion.
+   ============================================================ */
+
+/* Blinking terminal block cursor. Uses currentColor so it inherits
+   whatever text color it's dropped into (accent, background, etc). */
+.cursor {
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  margin-left: 0.1em;
+  vertical-align: -0.15em;
+  background: currentColor;
+  animation: caret-blink 1s step-end infinite;
+}
+
+@keyframes caret-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Phosphor glow for a handful of focal headings/labels. text-shadow rides
+   on currentColor so it works across every theme and every heading color
+   without hardcoding a var. Two layers (tight + wide) read more like an
+   actual CRT phosphor bloom than a single soft shadow. */
+.glow-text {
+  text-shadow:
+    0 0 3px color-mix(in oklab, currentColor 55%, transparent),
+    0 0 14px color-mix(in oklab, currentColor 35%, transparent);
+}
+
+/* A minimal square-cornered frame with a small labeled tab (icon + text)
+   cut into the top border, like a labeled pane -- a lighter-weight cousin
+   of .term-window's full titlebar chrome, used for content that should
+   read as "terminal" without the visual weight of a real window (whoami
+   hero, GitHub stat cards). See TermFrame.astro. */
+.term-frame {
+  position: relative;
+  border: 1px solid color-mix(in oklab, var(--theme-accent) 30%, transparent);
+  border-radius: 0.375rem;
+  padding: 1.75rem 1.25rem 1.25rem;
+}
+
+.term-frame-label {
+  position: absolute;
+  top: -0.7em;
+  left: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 0 0.5em;
+  background: var(--theme-background);
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  color: color-mix(in oklab, var(--theme-accent) 85%, transparent);
+}
+
+.term-frame-icon {
+  width: 0.85em;
+  height: 0.85em;
+  flex: none;
+}
+
+/* Terminal-style typewriter for short, fixed strings (e.g. "$ whoami" or
+   the logo). Set `--type-len` (a bare number, no unit) to the string's
+   character count on each usage; it drives both the step count and the
+   final width so there's only one number to get right. Structural rules
+   live here; pick a speed with .anim-typing-solo or .anim-typing-retro. */
+.anim-typing {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  vertical-align: bottom;
+  width: 0;
+}
+
+/* Quick, plain typing -- used for inline prompts like "$ whoami". */
+.anim-typing-solo {
+  animation: type-in var(--type-duration, 0.6s) steps(var(--type-len, 8), end) forwards;
+}
+
+/* Slower, mechanical typing with a power-flicker layered on top -- used
+   for the logo, where the extra weight reads as an old terminal booting
+   up rather than a snappy UI transition. */
+.anim-typing-retro {
+  animation:
+    type-in var(--type-duration, 1.8s) steps(var(--type-len, 8), end) forwards,
+    retro-flicker var(--type-duration, 1.8s) steps(7, end) forwards;
+}
+
+@keyframes type-in {
+  to {
+    width: calc(var(--type-len, 8) * 1ch);
+  }
+}
+
+@keyframes retro-flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  8% {
+    opacity: 0.35;
+  }
+  16% {
+    opacity: 0.9;
+  }
+  24% {
+    opacity: 0.5;
+  }
+  32% {
+    opacity: 1;
+  }
+  55% {
+    opacity: 0.75;
+  }
+  63% {
+    opacity: 1;
+  }
+}
+
+/* Simple fade + rise, used for hero entrance choreography. */
+.anim-fade-up {
+  opacity: 0;
+  transform: translateY(10px);
+  animation: fade-up 0.6s ease-out forwards;
+}
+
+@keyframes fade-up {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scroll-triggered reveal. Toggled by a tiny IntersectionObserver in
+   Layout.astro; anything below the fold opts in with `data-reveal`. */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 0.5s ease,
+    transform 0.5s ease;
+}
+
+[data-reveal].is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Light stagger for lists of revealed items (post cards, tags, etc). */
+[data-reveal]:nth-of-type(2) {
+  transition-delay: 60ms;
+}
+[data-reveal]:nth-of-type(3) {
+  transition-delay: 120ms;
+}
+[data-reveal]:nth-of-type(4) {
+  transition-delay: 180ms;
+}
+[data-reveal]:nth-of-type(5) {
+  transition-delay: 240ms;
+}
+[data-reveal]:nth-of-type(6) {
+  transition-delay: 300ms;
+}
+
+/* Animated underline sweep for nav links, replacing a static underline. */
+.nav-link {
+  position: relative;
+  text-decoration: none;
+  padding-bottom: 1px;
+}
+
+.nav-link::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  width: 100%;
+  height: 2px;
+  background: var(--theme-accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.25s ease;
+}
+
+.nav-link:hover::after,
+.nav-link:focus-visible::after {
+  transform: scaleX(1);
+}
+
+/* Brief chromatic-aberration flicker on hover/focus -- an RGB channel
+   split for a couple frames, evoking a CRT signal hiccup. A fixed
+   iteration count (not infinite) so it reads as triggered by the
+   interaction rather than an ambient loop. Apply .glitch-hover directly
+   to a hoverable element, or write a `.parent:hover .child` rule reusing
+   the same keyframes (see .post-row-link below) when the trigger area is
+   bigger than the text itself. */
+.glitch-hover:hover,
+.glitch-hover:focus-visible {
+  animation: chromatic-flicker 0.3s steps(2) 1;
+}
+
+@keyframes chromatic-flicker {
+  0% {
+    text-shadow: none;
+  }
+  40% {
+    text-shadow:
+      -2px 0 var(--theme-red),
+      2px 0 var(--theme-cyan);
+  }
+  70% {
+    text-shadow:
+      2px 0 var(--theme-red),
+      -2px 0 var(--theme-cyan);
+  }
+  100% {
+    text-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glitch-hover:hover,
+  .glitch-hover:focus-visible {
+    animation: none;
+  }
+}
+
+/* Social/footer icon links get a small lift + glow instead of a plain
+   color change. */
+.social-link {
+  display: inline-flex;
+  color: color-mix(in oklab, var(--theme-foreground) 70%, transparent);
+  transition:
+    color 0.2s ease,
+    transform 0.2s ease,
+    filter 0.2s ease;
+}
+
+.social-link:hover,
+.social-link:focus-visible {
+  color: var(--theme-accent);
+  transform: translateY(-2px);
+  filter: drop-shadow(0 0 6px color-mix(in oklab, var(--theme-accent) 50%, transparent));
+}
+
+/* Post list cards: an accent rail slides in on hover/focus instead of
+   a heavy card/shadow treatment, keeping the flat minimal look. */
+.post-card {
+  border-left: 2px solid transparent;
+  padding-left: 0.85rem;
+  margin-left: -0.85rem;
+  border-radius: 0 0.75rem 0.75rem 0;
+  transition:
+    border-color 0.25s ease,
+    background-color 0.25s ease;
+}
+
+.post-card:hover,
+.post-card:focus-within {
+  border-left-color: var(--theme-accent);
+  background-color: color-mix(in oklab, var(--theme-accent) 4%, transparent);
+}
+
+/* Section header underline grows in once revealed. */
+.block-header-bar {
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.6s ease 0.1s;
+}
+
+[data-reveal].is-visible .block-header-bar {
+  transform: scaleX(1);
+}
+
+/* Logo: a slow, subtle "power LED" breathing glow. One focal point,
+   kept faint so it reads as alive without being distracting. */
+#logo {
+  position: relative;
+  animation: logo-breathe 4s ease-in-out infinite;
+}
+
+@keyframes logo-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--theme-accent) 0%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 16px 1px color-mix(in oklab, var(--theme-accent) 30%, transparent);
+  }
+}
+
+/* Subtle cross-fade + drift between pages, layered on top of the
+   native view-transition already enabled above. */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root) {
+    animation: vt-out 180ms ease-out both;
+  }
+
+  ::view-transition-new(root) {
+    animation: vt-in 220ms ease-out both;
+  }
+}
+
+@keyframes vt-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes vt-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cursor,
+  #logo,
+  .anim-typing,
+  .anim-fade-up,
+  [data-reveal],
+  .block-header-bar {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .anim-typing {
+    width: calc(var(--type-len, 8) * 1ch) !important;
+  }
+
+  .anim-fade-up,
+  [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .block-header-bar {
+    transform: scaleX(1) !important;
+  }
+
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
   }
 }
 
@@ -609,4 +1108,269 @@ article img {
   input[type='submit'] {
     @apply border-accent cursor-pointer;
   }
+}
+
+/* ============================================================
+   Boot sequence
+   A once-per-session fake POST/boot log shown before the site is
+   "usable". Visibility is driven entirely by the `data-boot-pending`
+   attribute on <html>, set by an early blocking inline script
+   (BootSequenceLoader.astro) before first paint -- so there's no
+   flash of the real page underneath, and with JS disabled the
+   overlay's CSS never matches and the site just works normally.
+   ============================================================ */
+.boot-overlay {
+  display: none;
+}
+
+html[data-boot-pending='true'] .boot-overlay {
+  display: flex;
+}
+
+html[data-boot-pending='true'] body {
+  overflow: hidden;
+}
+
+.boot-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 0.35em;
+  padding: 2rem 2rem 3rem;
+  background: var(--theme-background);
+  color: var(--theme-accent);
+  font-family: var(--font-vt323);
+  font-size: 1.5rem;
+  line-height: 1.35;
+  outline: none;
+  transition: opacity 0.4s ease;
+  animation: boot-glitch 4s steps(1) infinite;
+}
+
+/* A CRT warming up: brief position-jump + hue/saturation jitter, mostly
+   invisible (transform: none) with a couple quick bursts per loop rather
+   than a continuous effect. steps(1) timing gives it a hard digital snap
+   between states instead of a smooth tween. */
+@keyframes boot-glitch {
+  0%,
+  6%,
+  9%,
+  100% {
+    transform: translate(0, 0);
+    filter: none;
+  }
+  6.5% {
+    transform: translate(-3px, 1px);
+    filter: hue-rotate(10deg) saturate(1.4);
+  }
+  7% {
+    transform: translate(3px, -1px);
+    filter: hue-rotate(-10deg);
+  }
+  7.5% {
+    transform: translate(0, 0);
+    filter: none;
+  }
+  8.2% {
+    transform: translate(-2px, 0);
+    filter: saturate(1.5);
+  }
+  8.5% {
+    transform: translate(0, 0);
+    filter: none;
+  }
+}
+
+.boot-overlay.is-dismissing {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.boot-line {
+  opacity: 0;
+  animation: boot-line-in 0.15s ease forwards;
+}
+
+.boot-line-ok {
+  color: color-mix(in oklab, var(--theme-green) 80%, var(--theme-accent));
+}
+
+.boot-prompt {
+  margin-top: 1em;
+  opacity: 0;
+  animation: boot-line-in 0.15s ease forwards;
+}
+
+.boot-prompt::after {
+  content: '';
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  margin-left: 0.3em;
+  vertical-align: -0.15em;
+  background: currentColor;
+  animation: caret-blink 1s step-end infinite;
+}
+
+@keyframes boot-line-in {
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Belt and suspenders: BootSequenceLoader already skips setting
+     data-boot-pending under reduced motion, so this rarely matters, but
+     covers the case where a stale attribute somehow survives. */
+  .boot-overlay {
+    animation: none;
+  }
+
+  .boot-line,
+  .boot-prompt {
+    animation: none;
+    opacity: 1;
+  }
+
+  .boot-prompt::after {
+    animation: none;
+  }
+}
+
+/* ============================================================
+   Terminal status bar (header)
+   Flatter and denser than a rounded pill bar -- a bottom border
+   instead of a filled pill, bracketed keyboard hotkeys, small
+   monospace meta text. Reads closer to a BIOS/terminal status
+   line than a typical site header.
+   ============================================================ */
+.term-statusbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--theme-accent) 25%, transparent);
+}
+
+.term-statusbar-meta {
+  display: none;
+  font-size: 0.8rem;
+  color: color-mix(in oklab, var(--theme-foreground) 50%, transparent);
+  white-space: nowrap;
+}
+
+@media (min-width: 640px) {
+  .term-statusbar-meta {
+    display: inline;
+  }
+}
+
+.term-statusbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-inline-start: auto;
+}
+
+.term-nav {
+  margin-top: 0.6rem;
+}
+
+.term-nav-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.4rem 1.5rem;
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+}
+
+.term-nav-hotkey {
+  color: var(--theme-accent);
+  font-weight: 700;
+}
+
+.term-nav-external {
+  opacity: 0.7;
+}
+
+/* ============================================================
+   Post row (dense terminal-list style, replaces a card + bordered
+   "Read" button treatment)
+   ============================================================ */
+.post-row {
+  width: 100%;
+  padding-block: 1rem;
+}
+
+.post-row-link {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  text-decoration: none;
+  color: inherit;
+}
+
+.post-row-marker {
+  flex: none;
+  color: var(--theme-accent);
+  font-weight: 700;
+}
+
+.post-row-title {
+  font-weight: 600;
+  color: var(--theme-heading1);
+}
+
+.post-row-fill {
+  flex: 1 1 auto;
+  min-width: 1.5rem;
+  align-self: center;
+  border-bottom: 1px dotted color-mix(in oklab, var(--theme-foreground) 22%, transparent);
+  transition: border-color 0.2s ease;
+}
+
+.post-row-arrow {
+  flex: none;
+  color: var(--theme-accent);
+  transition: transform 0.2s ease;
+}
+
+.post-row-link:hover .post-row-arrow,
+.post-row-link:focus-visible .post-row-arrow {
+  transform: translateX(4px);
+}
+
+.post-row-link:hover .post-row-fill,
+.post-row-link:focus-visible .post-row-fill {
+  border-color: color-mix(in oklab, var(--theme-accent) 50%, transparent);
+}
+
+.post-row-link:hover .post-row-title,
+.post-row-link:focus-visible .post-row-title {
+  animation: chromatic-flicker 0.3s steps(2) 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .post-row-link:hover .post-row-title,
+  .post-row-link:focus-visible .post-row-title {
+    animation: none;
+  }
+}
+
+.post-row-meta {
+  margin-top: 0.6rem;
+}
+
+.post-row-desc {
+  margin-top: 0.5rem;
+  color: color-mix(in oklab, var(--theme-foreground) 85%, transparent);
+}
+
+.post-row-tags {
+  margin-top: 0.75rem;
 }

@@ -1,0 +1,182 @@
+---
+// A lightweight isometric CSS 3D bar chart of the last year of GitHub
+// contributions, aggregated to one bar per week (53 bars) rather than a
+// full day-by-day skyline -- keeps the DOM small and the 3D math simple
+// (each bar fakes depth with two pseudo-element faces; no WebGL/3D library).
+// Skipped in dev mode so `astro dev` doesn't burn through jogruber's
+// rate limits on every reload -- see Search.astro for the same pattern
+// applied to Pagefind.
+import { calcColorScale } from '~/utils'
+
+interface Props {
+  username: string
+}
+const { username } = Astro.props
+
+interface ContributionDay {
+  date: string
+  count: number
+}
+
+async function fetchJson<T>(url: string): Promise<T | null> {
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return null
+    return (await res.json()) as T
+  } catch {
+    return null
+  }
+}
+
+interface WeekBar {
+  start: string
+  total: number
+  height: number
+  color: string
+}
+
+let weekBars: WeekBar[] = []
+let fetchFailed = false
+
+const MIN_HEIGHT = 4
+const MAX_HEIGHT = 56
+const LEVELS = 5 // 0 (no activity) through 4 (busiest), matches the flat calendar's scale
+
+if (import.meta.env.PROD) {
+  const data = await fetchJson<{ contributions: ContributionDay[] }>(
+    `https://github-contributions-api.jogruber.de/v4/${username}?y=last`,
+  )
+  if (!data || data.contributions.length === 0) {
+    fetchFailed = true
+  } else {
+    const days = data.contributions
+    const rawWeeks: Array<{ start: string; total: number }> = []
+    for (let i = 0; i < days.length; i += 7) {
+      const chunk = days.slice(i, i + 7)
+      const total = chunk.reduce((sum, d) => sum + d.count, 0)
+      rawWeeks.push({ start: chunk[0]?.date ?? '', total })
+    }
+    const maxTotal = Math.max(1, ...rawWeeks.map((w) => w.total))
+    const colorScale = calcColorScale(
+      ['var(--theme-background)', 'var(--theme-accent)'],
+      LEVELS,
+    )
+    weekBars = rawWeeks.map(({ start, total }) => {
+      const ratio = total / maxTotal
+      const level =
+        total === 0 ? 0 : Math.min(LEVELS - 1, Math.ceil(ratio * (LEVELS - 1)))
+      return {
+        start,
+        total,
+        height:
+          total === 0
+            ? MIN_HEIGHT
+            : Math.round(MIN_HEIGHT + ratio * (MAX_HEIGHT - MIN_HEIGHT)),
+        color: colorScale[level] ?? colorScale[0],
+      }
+    })
+  }
+}
+---
+
+{
+  import.meta.env.PROD ? (
+    fetchFailed ? (
+      <p class="text-foreground/60 text-sm">
+        Contribution data is unavailable right now (rate limited or offline).
+      </p>
+    ) : (
+      weekBars.length > 0 && (
+        <div
+          class="c3d-scene"
+          role="img"
+          aria-label={`GitHub contributions over the last year for ${username}, as a 3D bar chart with one bar per week`}
+        >
+          {weekBars.map((week, i) => (
+            <div
+              class="c3d-bar"
+              data-reveal
+              style={`--h: ${week.height}px; --bar-color: ${week.color}; transition-delay: ${Math.min(i * 10, 500)}ms`}
+              title={`Week of ${week.start}: ${week.total} contribution${week.total === 1 ? '' : 's'}`}
+            />
+          ))}
+        </div>
+      )
+    )
+  ) : (
+    <p class="text-foreground/60 text-sm">
+      The 3D contribution chart renders at build time. Run{' '}
+      <code>npm run build && npm run preview</code> to see it locally.
+    </p>
+  )
+}
+
+<style>
+  .c3d-scene {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 4.5rem;
+    padding: 0.5rem 0.25rem 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .c3d-bar {
+    position: relative;
+    flex: none;
+    width: 7px;
+    height: var(--h);
+    background: var(--bar-color);
+    transform-style: preserve-3d;
+    transform-origin: bottom;
+    transform: rotateX(-18deg) rotateY(28deg) scaleY(0);
+    transition:
+      transform 0.5s ease,
+      filter 0.15s ease;
+    cursor: default;
+  }
+
+  .c3d-bar.is-visible {
+    transform: rotateX(-18deg) rotateY(28deg) scaleY(1);
+  }
+
+  .c3d-bar:hover {
+    filter: brightness(1.15);
+  }
+
+  .c3d-bar::before,
+  .c3d-bar::after {
+    content: '';
+    position: absolute;
+  }
+
+  /* Top face */
+  .c3d-bar::before {
+    top: -4px;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background: color-mix(in oklab, var(--bar-color) 70%, white);
+    transform: rotateX(90deg);
+    transform-origin: top;
+  }
+
+  /* Side face */
+  .c3d-bar::after {
+    top: 0;
+    right: -4px;
+    width: 4px;
+    height: 100%;
+    background: color-mix(in oklab, var(--bar-color) 55%, black);
+    transform: rotateY(90deg);
+    transform-origin: right;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .c3d-bar {
+      transition: none;
+      transform: rotateX(-18deg) rotateY(28deg) scaleY(1);
+    }
+  }
+</style>

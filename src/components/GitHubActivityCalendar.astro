@@ -18,14 +18,11 @@ import type {
   GitHubActivityWeek,
   GitHubActivityMonthLabel,
 } from '~/types'
+import { range, calcColorScale } from '~/utils'
 
 interface Props {
   username: string
   year?: number
-}
-
-function range(n: number) {
-  return [...Array(n).keys()]
 }
 
 async function fetchData(
@@ -56,21 +53,6 @@ async function fetchData(
   validateActivities(data.contributions)
 
   return data
-}
-
-function calcColorScale([start, end]: [string, string], steps: number): Array<string> {
-  return range(steps).map((i) => {
-    switch (i) {
-      case 0:
-        return start
-      case steps - 1:
-        return end
-      default: {
-        const pos = (i / (steps - 1)) * 100
-        return `color-mix(in oklab, ${end} ${parseFloat(pos.toFixed(2))}%, ${start})`
-      }
-    }
-  })
 }
 
 function fillHoles(activities: Array<GitHubActivityDay>): Array<GitHubActivityDay> {
